@@ -1,9 +1,9 @@
 streamlit
-rapidfuzz
-ImageHash
-Pillow
-opencv-python-headless
-numpy
-joblib
 scikit-learn
+joblib
+numpy
 pandas
+pillow
+opencv-python-headless
+imagehash
+rapidfuzz
