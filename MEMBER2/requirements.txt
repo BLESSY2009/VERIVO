@@ -2,3 +2,9 @@ streamlit>=1.30.0
 rapidfuzz
 ImageHash
 Pillow
+tensorflow
+opencv-python
+numpy
+joblib
+scikit-learn
+pandas
