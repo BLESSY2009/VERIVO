@@ -1,9 +1,8 @@
-streamlit>=1.30.0
+streamlit
 rapidfuzz
 ImageHash
 Pillow
-tensorflow
-opencv-python
+opencv-python-headless
 numpy
 joblib
 scikit-learn
