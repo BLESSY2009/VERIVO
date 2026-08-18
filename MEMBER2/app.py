@@ -1,3 +1,4 @@
+from pathlib import Path
 import time
 from datetime import datetime
 
@@ -126,7 +127,7 @@ def go_to(page):
 # ============================================================
 def header():
 
-    logo_path = Path(__file__).resolve().parent / "verivo_logo.jpeg"
+    logo_path = Path(__file__).resolve().parent / "verivo_logo.png"
 
     col1, col2, col3 = st.columns([1, 2, 1])
 
