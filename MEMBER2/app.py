@@ -1,401 +1,873 @@
-
-
 import time
 from datetime import datetime
 
 import streamlit as st
-from detector import analyze_profile
+
 from predict import predict_profile
 from risk_engine import calculate_behaviour_risk
-from identity_analysis import analyze_identity
+
+
+# ============================================================
+# VERIVO — VERIFY • DETECT • PROTECT
+# ============================================================
 
 st.set_page_config(
-    page_title="Verivo | Verify. Detect. Protect.",
+    page_title="Verivo | Fake Profile Detection",
     page_icon="✦",
     layout="centered",
 )
 
-# ---------------- Brand tokens (from Verivo logo) ----------------
+
+# ============================================================
+# BRAND COLORS
+# ============================================================
+
 CREAM = "#FAF6F2"
 INK = "#242034"
 PURPLE_DARK = "#6E5A9C"
 PURPLE_LIGHT = "#A99BD1"
-GOLD_ACCENT = "#B99B6B"
+GOLD = "#B99B6B"
 
-st.markdown(f"""
+
+# ============================================================
+# STYLING
+# ============================================================
+
+st.markdown(
+    f"""
     <style>
+
     .stApp {{
         background-color: {CREAM};
     }}
-    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700;900&family=Jost:wght@300;400;500;600&display=swap');
-
-    html, body, [class*="css"] {{
-        font-family: 'Jost', sans-serif;
-        color: {INK};
-    }}
 
     .verivo-word {{
-        font-family: 'Playfair Display', serif;
-        font-size: 4.2rem;
+        font-family: Georgia, serif;
+        font-size: 4rem;
         text-align: center;
-        letter-spacing: 0.35rem;
+        letter-spacing: 0.3rem;
         color: {INK};
         margin-bottom: 0;
-        font-weight: 500;
     }}
-    .verivo-tagline {{
-        text-align: center;
-        letter-spacing: 0.28rem;
-        font-size: 0.85rem;
-        color: {PURPLE_DARK};
-        text-transform: uppercase;
-        margin-top: -4px;
-        margin-bottom: 2.5rem;
-    }}
-    .verivo-tagline .accent {{ color: {INK}; }}
 
-    .section-title {{
-        font-family: 'Playfair Display', serif;
+    .tagline {{
+        text-align: center;
+        color: {PURPLE_DARK};
+        letter-spacing: 0.2rem;
+        margin-bottom: 2rem;
+    }}
+
+    .card {{
+        background: white;
+        padding: 1.5rem;
+        border-radius: 18px;
+        border: 1px solid #ECE4F4;
+        margin-bottom: 1rem;
+    }}
+
+    .title {{
+        font-family: Georgia, serif;
         font-size: 1.6rem;
         color: {INK};
-        margin-bottom: 0.3rem;
     }}
-    .section-sub {{
+
+    .sub {{
         color: #6b647f;
-        margin-bottom: 1.5rem;
-        font-size: 0.95rem;
     }}
 
-    div.stButton > button {{
-        background-color: {INK};
-        color: {CREAM};
-        border-radius: 30px;
-        padding: 0.55rem 1.8rem;
-        border: none;
-        font-family: 'Jost', sans-serif;
-        letter-spacing: 0.08rem;
-        font-weight: 500;
-        width: 100%;
-    }}
-    div.stButton > button:hover {{
-        background-color: {PURPLE_DARK};
-        color: white;
+    .real {{
+        color: #4C8863;
+        font-weight: bold;
     }}
 
-    .verivo-card {{
-        background-color: white;
-        border-radius: 18px;
-        padding: 1.6rem 1.8rem;
-        border: 1px solid #ECE4F4;
-        margin-bottom: 1.2rem;
+    .suspicious {{
+        color: {GOLD};
+        font-weight: bold;
     }}
 
-    .fake-badge {{ color: #B3413A; font-weight: 600; }}
-    .suspicious-badge {{ color: {GOLD_ACCENT}; font-weight: 600; }}
-    .real-badge {{ color: #4C8863; font-weight: 600; }}
+    .fake {{
+        color: #B3413A;
+        font-weight: bold;
+    }}
 
-    .reason-item {{ padding: 5px 0px; color: {INK}; }}
-
-    .verivo-footer {{
+    .footer {{
         text-align: center;
-        color: #b3aac2;
-        font-size: 0.78rem;
-        letter-spacing: 0.1rem;
+        color: #aaa0b5;
+        font-size: 0.75rem;
         margin-top: 3rem;
     }}
+
     </style>
-""", unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True,
+)
 
 
-# ---------------- Session state / page router ----------------
-if "step" not in st.session_state:
-    st.session_state.step = "home"
+# ============================================================
+# SESSION STATE
+# ============================================================
+
+if "page" not in st.session_state:
+    st.session_state.page = "home"
+
 if "profile" not in st.session_state:
     st.session_state.profile = {}
+
 if "result" not in st.session_state:
     st.session_state.result = None
 
 
-def go_to(step: str):
-    st.session_state.step = step
+def go_to(page):
+    st.session_state.page = page
 
 
-def brand_header():
-    st.markdown('<p class="verivo-word">verivo</p>', unsafe_allow_html=True)
+# ============================================================
+# HEADER
+# ============================================================
+def header():
+
+    logo_path = "verivo_logo.png"
+
+    col1, col2, col3 = st.columns([1, 2, 1])
+
+    with col2:
+        st.image(
+            logo_path,
+            use_container_width=True
+        )
+
     st.markdown(
-        '<p class="verivo-tagline">verify <span class="accent">•</span> detect '
-        '<span class="accent">•</span> protect</p>',
+        '<div class="tagline">VERIFY • DETECT • PROTECT</div>',
         unsafe_allow_html=True,
     )
 
 
-# ==========================================================
-# STEP 1: HOME
-# ==========================================================
-if st.session_state.step == "home":
-    brand_header()
+# ============================================================
+# HOME PAGE
+# ============================================================
+
+if st.session_state.page == "home":
+
+    header()
+
     st.markdown(
-        f"""
-        <div class="verivo-card" style="text-align:center;">
-            <p class="section-title">Fake Profile Detection</p>
-            <p class="section-sub">
-                Verivo checks a social media profile's public signals — followers,
-                activity, account age and more — and flags the patterns real
-                accounts don't usually have.
-            </p>
+        """
+        <div class="card" style="text-align:center;">
+
+        <div class="title">
+        Fake Social Media Profile Detection
+        </div>
+
+        <p class="sub">
+        Verivo analyses publicly supplied profile signals such as
+        account age, followers, following, posts and engagement.
+        </p>
+
+        <p class="sub">
+        The system estimates <b>risk</b>.
+        It does not prove that an account is fake.
+        </p>
+
         </div>
         """,
         unsafe_allow_html=True,
     )
-    col1, col2, col3 = st.columns([1, 1.4, 1])
-    with col2:
-        if st.button("Get Started →"):
-            go_to("input")
-    st.markdown('<p class="verivo-footer">HACKATHON PROJECT · V1.0</p>', unsafe_allow_html=True)
+
+    if st.button(
+        "Get Started →",
+        use_container_width=True,
+    ):
+
+        go_to("input")
+        st.rerun()
+
+    st.markdown(
+        '<div class="footer">HACKATHON PROJECT • VERIVO V1.0</div>',
+        unsafe_allow_html=True,
+    )
 
 
-# ==========================================================
-# STEP 2: PROFILE INPUT
-# ==========================================================
-elif st.session_state.step == "input":
-    brand_header()
-    st.markdown('<p class="section-title">Profile Input</p>', unsafe_allow_html=True)
-    st.markdown('<p class="section-sub">Enter the profile\'s details to begin analysis.</p>', unsafe_allow_html=True)
+# ============================================================
+# PROFILE INPUT PAGE
+# ============================================================
+
+elif st.session_state.page == "input":
+
+    header()
+
+    st.markdown(
+        '<div class="title">Profile Input</div>',
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        '<div class="sub">Enter the available public profile information.</div>',
+        unsafe_allow_html=True,
+    )
 
     with st.form("profile_form"):
+
+        st.markdown("### Basic Information")
+
+        username = st.text_input(
+            "Username",
+            placeholder="e.g. genuine_user"
+        )
+
+        full_name = st.text_input(
+            "Display Name",
+            placeholder="e.g. Genuine User"
+        )
+
+        bio_text = st.text_area(
+            "Bio",
+            placeholder="Enter profile bio if available..."
+        )
+
+        st.markdown("### Profile Statistics")
+
         col1, col2 = st.columns(2)
+
         with col1:
-            username = st.text_input("Username", placeholder="e.g. john_doe_123456")
-            full_name = st.text_input("Display Name", placeholder="e.g. John Doe")
-            followers = st.number_input("Followers count", min_value=0, value=100)
-            following = st.number_input("Following count", min_value=0, value=100)
-            posts = st.number_input("Number of posts", min_value=0, value=10)
-            likes = st.number_input("Average likes", min_value=0, value=10)
-            comments = st.number_input("Average comments", min_value=0, value=2)
+
+            followers = st.number_input(
+                "Followers",
+                min_value=0,
+                value=213,
+                step=1,
+            )
+
+            posts = st.number_input(
+                "Posts",
+                min_value=0,
+                value=25,
+                step=1,
+            )
+
+            likes = st.number_input(
+                "Average Likes",
+                min_value=0,
+                value=20,
+                step=1,
+            )
+
         with col2:
-            account_age_days = st.number_input("Account age (in days)", min_value=0, value=180)
-            has_profile_pic = st.checkbox("Has a profile picture", value=True)
-            has_bio = st.checkbox("Has a bio", value=True)
-            is_verified = st.checkbox("Verified account", value=False)
-            bio_text = st.text_area("Bio text (optional)", placeholder="Paste bio here...")
-            reference_username = st.text_input("Reference Username",placeholder="e.g. genuine_user")
-            reference_name = st.text_input("Reference Display Name",placeholder="e.g. Genuine User")
 
-            reference_bio = st.text_area("Reference Bio",placeholder="Enter genuine profile bio...")
+            following = st.number_input(
+                "Following",
+                min_value=0,
+                value=210,
+                step=1,
+            )
 
-            submitted = st.form_submit_button("Analyse Profile →")
+            account_age_days = st.number_input(
+                "Account Age (days)",
+                min_value=0,
+                value=500,
+                step=1,
+            )
+
+            comments = st.number_input(
+                "Average Comments",
+                min_value=0,
+                value=3,
+                step=1,
+            )
+
+        st.markdown("### Optional Profile Signals")
+
+        col3, col4 = st.columns(2)
+
+        with col3:
+
+            has_profile_pic = st.checkbox(
+                "Has Profile Picture",
+                value=True,
+            )
+
+        with col4:
+
+            is_verified = st.checkbox(
+                "Verified Account",
+                value=False,
+            )
+
+        has_bio = len(bio_text.strip()) > 0
+
+        st.caption(
+            "A missing profile picture or bio is NOT automatically treated as evidence of a fake account."
+        )
+
+        submitted = st.form_submit_button(
+            "Analyse Profile →",
+            use_container_width=True,
+        )
 
     if submitted:
+
         st.session_state.profile = {
-            "username": username,
-            "full_name": full_name,
-            "followers": followers,
-            "following": following,
-            "posts": posts,
-            "likes": likes,
-            "comments": comments,
-            "account_age_days": account_age_days,
+
+            "username": username.strip(),
+
+            "full_name": full_name.strip(),
+
+            "bio_text": bio_text.strip(),
+
+            "followers": int(followers),
+
+            "following": int(following),
+
+            "posts": int(posts),
+
+            "likes": int(likes),
+
+            "comments": int(comments),
+
+            "account_age_days": int(account_age_days),
+
             "has_profile_pic": has_profile_pic,
+
             "has_bio": has_bio,
+
             "is_verified": is_verified,
-            "bio_text": bio_text,
+
         }
+
         go_to("analyse")
         st.rerun()
 
-    if st.button("← Back to Home"):
+    if st.button(
+        "← Back to Home",
+        use_container_width=True,
+    ):
+
         go_to("home")
+        st.rerun()
 
 
-# ==========================================================
-# STEP 3: ANALYSE (confirmation / trigger screen)
-# ==========================================================
-elif st.session_state.step == "analyse":
-    brand_header()
+# ============================================================
+# ANALYSE CONFIRMATION PAGE
+# ============================================================
+
+elif st.session_state.page == "analyse":
+
+    header()
+
     p = st.session_state.profile
-    st.markdown('<p class="section-title">Ready to Analyse</p>', unsafe_allow_html=True)
+
+    st.markdown(
+        '<div class="title">Ready to Analyse</div>',
+        unsafe_allow_html=True,
+    )
+
     st.markdown(
         f"""
-        <div class="verivo-card">
-            <b>@{p.get('username') or 'unknown'}</b><br>
-            {p.get('followers', 0)} followers · {p.get('following', 0)} following ·
-            {p.get('posts', 0)} posts · {p.get('account_age_days', 0)} days old
+        <div class="card">
+
+        <b>@{p.get("username") or "unknown"}</b>
+
+        <br><br>
+
+        {p.get("followers", 0):,} followers •
+        {p.get("following", 0):,} following •
+        {p.get("posts", 0):,} posts
+
+        <br>
+
+        Account age:
+        {p.get("account_age_days", 0):,} days
+
         </div>
         """,
         unsafe_allow_html=True,
     )
+
     col1, col2 = st.columns(2)
+
     with col1:
-        if st.button("← Edit Details"):
+
+        if st.button(
+            "← Edit",
+            use_container_width=True,
+        ):
+
             go_to("input")
+            st.rerun()
+
     with col2:
-        if st.button("Start Analysis →"):
+
+        if st.button(
+            "Start Analysis →",
+            use_container_width=True,
+        ):
+
             go_to("loading")
             st.rerun()
 
 
-# ==========================================================
-# STEP 4: LOADING
-# ==========================================================
-elif st.session_state.step == "loading":
-    brand_header()
-    st.markdown('<p class="section-title">Analysing Profile…</p>', unsafe_allow_html=True)
-    progress_bar = st.progress(0)
-    steps = [
-        "Checking username pattern...",
-        "Evaluating follower/following ratio...",
-        "Reviewing account age vs activity...",
-        "Scanning bio for spam signals...",
-        "Compiling results...",
-    ]
-    status = st.empty()
-    for i, msg in enumerate(steps):
-        status.markdown(f"<p class='section-sub'>{msg}</p>", unsafe_allow_html=True)
-        progress_bar.progress(int((i + 1) / len(steps) * 100))
-        time.sleep(0.4)
+# ============================================================
+# LOADING / ANALYSIS PAGE
+# ============================================================
 
-    ml_result = predict_profile(
-        account_age_days=st.session_state.profile["account_age_days"],
-        followers=st.session_state.profile["followers"],
-        following=st.session_state.profile["following"],
-        posts=st.session_state.profile["posts"],
-        engagement_rate=0.2,
+elif st.session_state.page == "loading":
+
+    header()
+
+    st.markdown(
+        '<div class="title">Analysing Profile...</div>',
+        unsafe_allow_html=True,
     )
-    behaviour_score, behaviour_level, behaviour_reasons = calculate_behaviour_risk(
-    st.session_state.profile["followers"],
-    st.session_state.profile["following"],
-    st.session_state.profile["posts"],
-    st.session_state.profile["likes"],
-    st.session_state.profile["comments"],
-)
 
-    st.session_state.result = {
-    "fake_score": ml_result["risk_score"],
-    "behaviour_score": behaviour_score,
-    "behaviour_level": behaviour_level,
-    "behaviour_reasons": behaviour_reasons,
-        "label": (
-            "Likely Fake"
-            if ml_result["risk_score"] >= 60
-            else "Suspicious"
-            if ml_result["risk_score"] >= 30
-            else "Likely Real"
-        ),
-        "reasons": [
-            indicator["message"]
-            for indicator in ml_result["indicators"]
-        ],
-    }
+    progress = st.progress(0)
 
-    go_to("result")
-    st.rerun()
-    go_to("result")
-    st.rerun()
+    status = st.empty()
 
+    analysis_steps = [
 
-# ==========================================================
-# STEP 5: RESULT DASHBOARD
-# ==========================================================
-elif st.session_state.step == "result":
-    brand_header()
-    result = st.session_state.result
+        "Checking account information...",
+
+        "Evaluating follower/following pattern...",
+
+        "Evaluating account age and activity...",
+
+        "Evaluating engagement behaviour...",
+
+        "Running VERIVO AI risk analysis...",
+
+        "Preparing risk assessment...",
+
+    ]
+
+    for i, message in enumerate(analysis_steps):
+
+        status.write(message)
+
+        progress.progress(
+            int((i + 1) / len(analysis_steps) * 100)
+        )
+
+        time.sleep(0.25)
+
     p = st.session_state.profile
 
-    score = result["fake_score"]
-    label = result["label"]
-    reasons = result["reasons"]
-    behaviour_score = result.get("behaviour_score", 0)
-    behaviour_level = result.get("behaviour_level", "LOW")
-    behaviour_reasons = result.get("behaviour_reasons", [])
+    try:
 
-    badge_class = "fake-badge" if label == "Likely Fake" else (
-        "suspicious-badge" if label == "Suspicious" else "real-badge"
+        # ----------------------------------------------------
+        # FAKEGUARD ML
+        # ----------------------------------------------------
+
+        ml_result = predict_profile(
+
+            account_age_days=p["account_age_days"],
+
+            followers=p["followers"],
+
+            following=p["following"],
+
+            posts=p["posts"],
+
+            # Temporary engagement value.
+            # This can be replaced with calculated engagement
+            # later when the model is redesigned.
+            engagement_rate=(
+                (
+                    p["likes"] + p["comments"]
+                )
+                / max(p["followers"], 1)
+            ) * 100,
+
+        )
+
+        # ----------------------------------------------------
+        # BEHAVIOUR ANALYSIS
+        # ----------------------------------------------------
+
+        behaviour_score, behaviour_level, behaviour_reasons = (
+            calculate_behaviour_risk(
+
+                p["followers"],
+
+                p["following"],
+
+                p["posts"],
+
+                p["likes"],
+
+                p["comments"],
+
+            )
+        )
+
+        # ----------------------------------------------------
+        # COMBINED RISK
+        # ----------------------------------------------------
+
+        ml_score = float(
+            ml_result["risk_score"]
+        )
+
+        combined_score = round(
+            (ml_score * 0.60)
+            +
+            (behaviour_score * 0.40),
+            2,
+        )
+
+        # ----------------------------------------------------
+        # IMPORTANT:
+        # Missing DP / missing bio are NOT added here.
+        # ----------------------------------------------------
+
+        if combined_score >= 70:
+
+            label = "High Suspicion"
+
+        elif combined_score >= 40:
+
+            label = "Moderate Suspicion"
+
+        else:
+
+            label = "Low Suspicion"
+
+        # ----------------------------------------------------
+        # Combine explanations
+        # ----------------------------------------------------
+
+        reasons = []
+
+        for indicator in ml_result.get(
+            "indicators",
+            []
+        ):
+
+            reasons.append(
+                indicator["message"]
+            )
+
+        for reason in behaviour_reasons:
+
+            if reason not in reasons:
+
+                reasons.append(reason)
+
+        # ----------------------------------------------------
+        # SAVE RESULT
+        # ----------------------------------------------------
+
+        st.session_state.result = {
+
+            "ml_score": ml_score,
+
+            "behaviour_score": behaviour_score,
+
+            "behaviour_level": behaviour_level,
+
+            "combined_score": combined_score,
+
+            "label": label,
+
+            "reasons": reasons,
+
+        }
+
+        go_to("result")
+        st.rerun()
+
+    except Exception as error:
+
+        st.error(
+            "Analysis could not be completed."
+        )
+
+        st.exception(error)
+
+        if st.button(
+            "← Back to Profile",
+            use_container_width=True,
+        ):
+
+            go_to("input")
+            st.rerun()
+
+
+# ============================================================
+# RESULT PAGE
+# ============================================================
+
+elif st.session_state.page == "result":
+
+    header()
+
+    p = st.session_state.profile
+
+    result = st.session_state.result
+
+    combined_score = result["combined_score"]
+
+    ml_score = result["ml_score"]
+
+    behaviour_score = result["behaviour_score"]
+
+    label = result["label"]
+
+    reasons = result["reasons"]
+
+    # --------------------------------------------------------
+    # Badge
+    # --------------------------------------------------------
+
+    if combined_score >= 70:
+
+        badge_class = "fake"
+
+    elif combined_score >= 40:
+
+        badge_class = "suspicious"
+
+    else:
+
+        badge_class = "real"
+
+    st.markdown(
+        '<div class="title">Result Dashboard</div>',
+        unsafe_allow_html=True,
     )
 
-    st.markdown('<p class="section-title">Result Dashboard</p>', unsafe_allow_html=True)
     st.markdown(
         f"""
-        <div class="verivo-card" style="text-align:center;">
-            <p style="color:#6b647f; margin-bottom:4px;">@{p.get('username') or 'unknown'}</p>
-            <p class="{badge_class}" style="font-size:1.7rem; margin:0;">{label}</p>
-            <p style="color:{INK}; font-size:0.95rem;">Fake Probability Score: <b>{score}/100</b></p>
+        <div class="card" style="text-align:center;">
+
+        <div style="color:#6b647f;">
+        @{p.get("username") or "unknown"}
+        </div>
+
+        <div class="{badge_class}"
+             style="font-size:1.8rem;margin-top:10px;">
+
+        {label}
+
+        </div>
+
+        <div style="font-size:1.1rem;margin-top:10px;">
+
+        Overall Risk Score:
+        <b>{combined_score}/100</b>
+
+        </div>
+
         </div>
         """,
         unsafe_allow_html=True,
     )
-    st.progress(score / 100)
-    st.markdown(
-    f"**Behaviour Risk:** {behaviour_score}/100  |  **Level:** {behaviour_level}"
+
+    st.progress(
+        min(combined_score / 100, 1.0)
     )
 
-    st.markdown('<div class="verivo-card">', unsafe_allow_html=True)
-    st.markdown('<p class="section-title" style="font-size:1.2rem;">Analysis Breakdown</p>', unsafe_allow_html=True)
+    # --------------------------------------------------------
+    # Risk components
+    # --------------------------------------------------------
+
+    st.markdown(
+        '<div class="card">',
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        "### Risk Breakdown"
+    )
+
+    st.write(
+        f"**AI Risk Score:** {ml_score}/100"
+    )
+
+    st.write(
+        f"**Behaviour Risk:** {behaviour_score}/100"
+    )
+
+    st.markdown(
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    # --------------------------------------------------------
+    # Reasons
+    # --------------------------------------------------------
+
+    st.markdown(
+        '<div class="card">',
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        "### Analysis Signals"
+    )
+
     if reasons:
-        for r in reasons:
-            st.markdown(f'<div class="reason-item">• {r}</div>', unsafe_allow_html=True)
+
+        for reason in reasons:
+
+            st.write(
+                f"• {reason}"
+            )
+
     else:
-        st.markdown('<div class="reason-item">No red flags detected. Profile looks fairly normal.</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+
+        st.success(
+            "No major suspicious behavioural signals were detected."
+        )
+
+    st.markdown(
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    # --------------------------------------------------------
+    # Important disclaimer
+    # --------------------------------------------------------
+
+    st.info(
+        "VERIVO provides an AI-assisted risk assessment. "
+        "A high or low score does not prove whether an account "
+        "is genuinely fake or real. Missing profile pictures, "
+        "missing bios, low followers, or low post counts alone "
+        "should not be treated as proof of a fake account."
+    )
+
+    # --------------------------------------------------------
+    # Buttons
+    # --------------------------------------------------------
 
     col1, col2 = st.columns(2)
+
     with col1:
-        if st.button("← Analyse Another Profile"):
+
+        if st.button(
+            "← Analyse Another",
+            use_container_width=True,
+        ):
+
+            st.session_state.profile = {}
+
+            st.session_state.result = None
+
             go_to("input")
+
             st.rerun()
+
     with col2:
-        if st.button("Generate Report →"):
+
+        if st.button(
+            "Generate Report →",
+            use_container_width=True,
+        ):
+
             go_to("report")
+
             st.rerun()
 
 
-# ==========================================================
-# STEP 6: GENERATE REPORT
-# ==========================================================
-elif st.session_state.step == "report":
-    brand_header()
-    result = st.session_state.result
+# ============================================================
+# REPORT PAGE
+# ============================================================
+
+elif st.session_state.page == "report":
+
+    header()
+
     p = st.session_state.profile
-    score = result["fake_score"]
-    label = result["label"]
-    reasons = result["reasons"]
 
-    st.markdown('<p class="section-title">Generate Report</p>', unsafe_allow_html=True)
-    st.markdown('<p class="section-sub">Download a summary of this analysis.</p>', unsafe_allow_html=True)
+    result = st.session_state.result
 
-    report_text = f"""VERIVO — VERIFY · DETECT · PROTECT
-Fake Profile Analysis Report
-Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}
+    report_text = f"""
+VERIVO — VERIFY • DETECT • PROTECT
 
-Profile: @{p.get('username') or 'unknown'}
-Display Name: {p.get('full_name') or '-'}
+FAKE SOCIAL MEDIA PROFILE RISK REPORT
+--------------------------------------
 
---- Stats ---
-Followers: {p.get('followers', 0)}
-Following: {p.get('following', 0)}
-Posts: {p.get('posts', 0)}
-Account Age: {p.get('account_age_days', 0)} days
-Verified: {'Yes' if p.get('is_verified') else 'No'}
+Generated:
+{datetime.now().strftime("%Y-%m-%d %H:%M")}
 
---- Result ---
-Verdict: {label}
-Fake Probability Score: {score}/100
+PROFILE
+-------
+Username: @{p.get("username") or "unknown"}
+Display Name: {p.get("full_name") or "-"}
 
---- Reasons ---
-""" + ("\n".join(f"- {r}" for r in reasons) if reasons else "- No red flags detected.")
+STATISTICS
+----------
+Followers: {p.get("followers", 0)}
+Following: {p.get("following", 0)}
+Posts: {p.get("posts", 0)}
+Account Age: {p.get("account_age_days", 0)} days
 
-    st.markdown('<div class="verivo-card">', unsafe_allow_html=True)
-    st.text(report_text)
-    st.markdown('</div>', unsafe_allow_html=True)
+RESULT
+------
+Overall Risk Score: {result["combined_score"]}/100
+Verdict: {result["label"]}
 
-    st.download_button(
-        label="⬇ Download Report (.txt)",
-        data=report_text,
-        file_name=f"verivo_report_{p.get('username') or 'profile'}.txt",
-        mime="text/plain",
+AI Risk Score: {result["ml_score"]}/100
+Behaviour Risk: {result["behaviour_score"]}/100
+
+ANALYSIS SIGNALS
+----------------
+"""
+
+    if result["reasons"]:
+
+        for reason in result["reasons"]:
+
+            report_text += f"- {reason}\n"
+
+    else:
+
+        report_text += "- No major suspicious signals detected.\n"
+
+    report_text += """
+
+DISCLAIMER
+----------
+This report provides an AI-assisted risk assessment.
+It does not prove that an account is fake or genuine.
+Missing profile pictures, missing bios, follower count,
+following count, or post count alone should not be treated
+as proof that an account is fake.
+"""
+
+    st.markdown(
+        '<div class="title">Generate Report</div>',
+        unsafe_allow_html=True,
     )
 
-    if st.button("← Back to Dashboard"):
+    st.text_area(
+        "Report Preview",
+        report_text,
+        height=500,
+    )
+
+    st.download_button(
+        "⬇ Download Report",
+        data=report_text,
+        file_name="verivo_report.txt",
+        mime="text/plain",
+        use_container_width=True,
+    )
+
+    if st.button(
+        "← Back to Dashboard",
+        use_container_width=True,
+    ):
+
         go_to("result")
+
         st.rerun()
 
-st.markdown('<p class="verivo-footer">VERIVO © 2026</p>', unsafe_allow_html=True)
+
+# ============================================================
+# FOOTER
+# ============================================================
+
+st.markdown(
+    '<div class="footer">VERIVO © 2026 • AI-ASSISTED RISK ASSESSMENT</div>',
+    unsafe_allow_html=True,
+)
