@@ -126,21 +126,27 @@ def go_to(page):
 # ============================================================
 def header():
 
-    logo_path = "verivo_logo.png"
+    logo_path = Path(__file__).resolve().parent / "verivo_logo.jpeg"
 
     col1, col2, col3 = st.columns([1, 2, 1])
 
     with col2:
-        st.image(
-            logo_path,
-            use_container_width=True
-        )
+
+        if logo_path.exists():
+            st.image(
+                str(logo_path),
+                use_container_width=True
+            )
+        else:
+            st.markdown(
+                '<div class="verivo-word">verivo</div>',
+                unsafe_allow_html=True
+            )
 
     st.markdown(
         '<div class="tagline">VERIFY • DETECT • PROTECT</div>',
         unsafe_allow_html=True,
     )
-
 
 # ============================================================
 # HOME PAGE
